@@ -153,29 +153,49 @@ func actionStrings(actions []clientgotesting.Action) []string {
 }
 
 func createEncryptionCfgNoWriteKey(keyID string, keyBase64 string, resources ...string) *apiserverconfigv1.EncryptionConfiguration {
-	return &apiserverconfigv1.EncryptionConfiguration{
+	keysResources := []encryptionKeysResourceTuple{}
+	for _, resource := range resources {
+		keysResources = append(keysResources, encryptionKeysResourceTuple{
+			resource: resource,
+			keys: []apiserverconfigv1.Key{
+				{Name: keyID, Secret: keyBase64},
+			},
+		})
+
+	}
+	return createEncryptionCfgNoWriteKeyMultipleReadKeys(keysResources)
+}
+
+func createEncryptionCfgNoWriteKeyMultipleReadKeys(keysResources []encryptionKeysResourceTuple) *apiserverconfigv1.EncryptionConfiguration {
+	ec := &apiserverconfigv1.EncryptionConfiguration{
 		TypeMeta: metav1.TypeMeta{
 			Kind:       "EncryptionConfiguration",
 			APIVersion: "apiserver.config.k8s.io/v1",
 		},
-		Resources: []apiserverconfigv1.ResourceConfiguration{
-			{
-				Resources: resources,
-				Providers: []apiserverconfigv1.ProviderConfiguration{
-					{
-						Identity: &apiserverconfigv1.IdentityConfiguration{},
-					},
-					{
-						AESCBC: &apiserverconfigv1.AESConfiguration{
-							Keys: []apiserverconfigv1.Key{
-								{Name: keyID, Secret: keyBase64},
-							},
-						},
-					},
+		Resources: []apiserverconfigv1.ResourceConfiguration{},
+	}
+
+	for _, keysResource := range keysResources {
+
+		rc := apiserverconfigv1.ResourceConfiguration{
+			Resources: []string{keysResource.resource},
+			Providers: []apiserverconfigv1.ProviderConfiguration{
+				{
+					Identity: &apiserverconfigv1.IdentityConfiguration{},
 				},
 			},
-		},
+		}
+		for _, key := range keysResource.keys {
+			rc.Providers = append(rc.Providers, apiserverconfigv1.ProviderConfiguration{
+				AESCBC: &apiserverconfigv1.AESConfiguration{
+					Keys: []apiserverconfigv1.Key{key},
+				},
+			})
+		}
+		ec.Resources = append(ec.Resources, rc)
 	}
+
+	return ec
 }
 
 func createEncryptionCfgWithWriteKey(keysResources []encryptionKeysResourceTuple) *apiserverconfigv1.EncryptionConfiguration {
@@ -268,4 +288,8 @@ func validateOperatorClientConditions(ts *testing.T, operatorClient v1helpers.St
 		}
 
 	}
+}
+
+func newFakeIdentityEncodedKeyForTest() string {
+	return "AAAAAAAAAAAAAAAAAAAAAA=="
 }
