@@ -238,6 +238,7 @@ func TestEncryptionConfigToGroupResourceKeysRoundtrip(t *testing.T) {
 							Secret: newFakeIdentityEncodedKeyForTest(),
 						},
 					},
+					modes: []string{"aescbc", "aesgcm"},
 				}
 				ec := createEncryptionCfgNoWriteKeyMultipleReadKeys([]encryptionKeysResourceTuple{keysRes})
 				return ec
@@ -245,11 +246,10 @@ func TestEncryptionConfigToGroupResourceKeysRoundtrip(t *testing.T) {
 			output: map[schema.GroupResource]groupResourceKeys{
 				{Group: "", Resource: "secrets"}: {
 					writeKey: keyAndMode{
-						key: apiserverconfigv1.Key{Name: "", Secret: ""}, mode: "identity",
+						key: apiserverconfigv1.Key{Name: "35", Secret: newFakeIdentityEncodedKeyForTest()}, mode: "identity",
 					},
 					readKeys: []keyAndMode{
 						{key: apiserverconfigv1.Key{Name: "34", Secret: "MTcxNTgyYTBmY2Q2YzVmZGI2NWNiZjVhM2U5MjQ5ZDc="}, mode: "aescbc"},
-						{key: apiserverconfigv1.Key{Name: "35", Secret: newFakeIdentityEncodedKeyForTest()}, mode: "aescbc"},
 					},
 				},
 			},
@@ -274,6 +274,7 @@ func TestEncryptionConfigToGroupResourceKeysRoundtrip(t *testing.T) {
 								Secret: newFakeIdentityEncodedKeyForTest(),
 							},
 						},
+						modes: []string{"aescbc", "aesgcm"},
 					},
 
 					{
@@ -290,6 +291,7 @@ func TestEncryptionConfigToGroupResourceKeysRoundtrip(t *testing.T) {
 								Secret: newFakeIdentityEncodedKeyForTest(),
 							},
 						},
+						modes: []string{"aescbc", "aesgcm"},
 					},
 				}
 				ec := createEncryptionCfgNoWriteKeyMultipleReadKeys(keysRes)
@@ -298,30 +300,32 @@ func TestEncryptionConfigToGroupResourceKeysRoundtrip(t *testing.T) {
 			output: map[schema.GroupResource]groupResourceKeys{
 				{Group: "", Resource: "secrets"}: {
 					writeKey: keyAndMode{
-						key: apiserverconfigv1.Key{Name: "", Secret: ""}, mode: "identity",
+						key: apiserverconfigv1.Key{Name: "35", Secret: newFakeIdentityEncodedKeyForTest()}, mode: "identity",
 					},
 					readKeys: []keyAndMode{
 						{key: apiserverconfigv1.Key{Name: "34", Secret: "MTcxNTgyYTBmY2Q2YzVmZGI2NWNiZjVhM2U5MjQ5ZDc="}, mode: "aescbc"},
-						{key: apiserverconfigv1.Key{Name: "35", Secret: newFakeIdentityEncodedKeyForTest()}, mode: "aescbc"},
 					},
 				},
 
 				{Group: "", Resource: "configmaps"}: {
 					writeKey: keyAndMode{
-						key: apiserverconfigv1.Key{Name: "", Secret: ""}, mode: "identity",
+						key: apiserverconfigv1.Key{Name: "35", Secret: newFakeIdentityEncodedKeyForTest()}, mode: "identity",
 					},
 					readKeys: []keyAndMode{
 						{key: apiserverconfigv1.Key{Name: "34", Secret: "MTcxNTgyYTBmY2Q2YzVmZGI2NWNiZjVhM2U5MjQ5ZDc="}, mode: "aescbc"},
-						{key: apiserverconfigv1.Key{Name: "35", Secret: newFakeIdentityEncodedKeyForTest()}, mode: "aescbc"},
 					},
 				},
 			},
 		},
+
+		// scenario 9
+		// TODO: encryption on after being off
 	}
 
 	for _, scenario := range scenarios {
 		t.Run(scenario.name, func(t *testing.T) {
 			actualOutput := getGRsActualKeys(scenario.input)
+
 			if len(actualOutput) != len(scenario.output) {
 				t.Fatalf("expected to get %d GR, got %d", len(scenario.output), len(actualOutput))
 			}
@@ -474,6 +478,9 @@ func TestGroupResourceKeysToEncryptionConfigRoundtrip(t *testing.T) {
 				return []apiserverconfigv1.ResourceConfiguration{rc, rs}
 			},
 		},
+
+		// scenario 6
+		// TODO: encryption on after being off
 	}
 
 	for _, scenario := range scenarios {

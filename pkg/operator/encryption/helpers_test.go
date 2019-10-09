@@ -195,12 +195,25 @@ func createEncryptionCfgNoWriteKeyMultipleReadKeys(keysResources []encryptionKey
 				},
 			},
 		}
-		for _, key := range keysResource.keys {
-			rc.Providers = append(rc.Providers, apiserverconfigv1.ProviderConfiguration{
-				AESCBC: &apiserverconfigv1.AESConfiguration{
-					Keys: []apiserverconfigv1.Key{key},
-				},
-			})
+		for index, key := range keysResource.keys {
+			desiredMode := ""
+			if len(keysResource.modes) == len(keysResource.keys) {
+				desiredMode = keysResource.modes[index]
+			}
+			switch desiredMode {
+			case "aesgcm":
+				rc.Providers = append(rc.Providers, apiserverconfigv1.ProviderConfiguration{
+					AESGCM: &apiserverconfigv1.AESConfiguration{
+						Keys: []apiserverconfigv1.Key{key},
+					},
+				})
+			default:
+				rc.Providers = append(rc.Providers, apiserverconfigv1.ProviderConfiguration{
+					AESCBC: &apiserverconfigv1.AESConfiguration{
+						Keys: []apiserverconfigv1.Key{key},
+					},
+				})
+			}
 		}
 		ec.Resources = append(ec.Resources, rc)
 	}
@@ -268,9 +281,13 @@ func createEncryptionCfgSecretWithWriteKeys(t *testing.T, targetNs string, revis
 	}
 }
 
+// TODO: change the name to encryptionKeysResourceMode
 type encryptionKeysResourceTuple struct {
 	resource string
 	keys     []apiserverconfigv1.Key
+	// an ordered list of an encryption modes thatch matches the keys
+	// for example mode[0] matches keys[0]
+	modes []string
 }
 
 func validateOperatorClientConditions(ts *testing.T, operatorClient v1helpers.StaticPodOperatorClient, expectedConditions []operatorv1.OperatorCondition) {
@@ -303,6 +320,6 @@ func newFakeIdentityEncodedKeyForTest() string {
 	return "AAAAAAAAAAAAAAAAAAAAAA=="
 }
 
-func newFakeIdentityKeyForTest() []byte{
+func newFakeIdentityKeyForTest() []byte {
 	return make([]byte, 16)
 }
