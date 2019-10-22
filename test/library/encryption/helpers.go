@@ -62,6 +62,7 @@ func TestEncryptionTypeAESCBC(t *testing.T) {
 	e := SetUp(t)
 	clientSet := SetAndWaitForEncryptionType(e, configv1.EncryptionTypeAESCBC)
 	AssertSecretsAndConfigMaps(e, clientSet, configv1.EncryptionTypeAESCBC)
+	AssertEncryptionConfigForSecretsAndConfigMaps(e, clientSet)
 }
 
 func SetAndWaitForEncryptionType(t testing.TB, encryptionType configv1.EncryptionType) ClientSet {

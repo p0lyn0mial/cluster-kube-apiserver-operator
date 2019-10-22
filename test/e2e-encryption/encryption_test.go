@@ -93,5 +93,5 @@ func TestEncryptionRotation(t *testing.T) {
 	}
 
 	// TODO: assert conditions - operator and encryption migration controller must report status as active not progressing, and not failing for all scenarios
-	// TODO: assert encryption config (resources) for all scenarios
+	encryption.AssertEncryptionConfigForSecretsAndConfigMaps(e, clientSet)
 }

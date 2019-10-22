@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -13,10 +14,16 @@ import (
 	"github.com/stretchr/testify/require"
 
 	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/runtime/serializer"
+	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
+	apiserverconfigv1 "k8s.io/apiserver/pkg/apis/config/v1"
 	"k8s.io/client-go/kubernetes"
 
 	configv1 "github.com/openshift/api/config/v1"
+	"github.com/openshift/cluster-kube-apiserver-operator/pkg/operator/operatorclient"
 )
 
 var protoEncodingPrefix = []byte{0x6b, 0x38, 0x73, 0x00}
@@ -32,6 +39,15 @@ const (
 	aesCBCTransformerPrefixV1    = "k8s:enc:aescbc:v1:"
 	secretboxTransformerPrefixV1 = "k8s:enc:secretbox:v1:"
 )
+
+var (
+	apiserverScheme = runtime.NewScheme()
+	apiserverCodecs = serializer.NewCodecFactory(apiserverScheme)
+)
+
+func init() {
+	utilruntime.Must(apiserverconfigv1.AddToScheme(apiserverScheme))
+}
 
 func AssertSecretsAndConfigMaps(t testing.TB, clientSet ClientSet, expectedMode configv1.EncryptionType) {
 	t.Helper()
@@ -53,6 +69,42 @@ func AssertSecretOfLifeEncrypted(t testing.TB, clientSet ClientSet, secretOfLife
 	rawSecretValue := GetRawSecretOfLife(t, clientSet)
 	if strings.Contains(rawSecretValue, string(secretOfLife.Data["quote"])) {
 		t.Errorf("The secret received from etcd have %q (plain text), content of the secret (etcd) %s", string(secretOfLife.Data["quote"]), rawSecretValue)
+	}
+}
+
+func AssertEncryptionConfigForSecretsAndConfigMaps(t testing.TB, clientSet ClientSet) {
+	t.Helper()
+	t.Logf("Checking if %q in %q has desired GRs %v", "encryption-config-openshift-kube-apiserver", operatorclient.GlobalMachineSpecifiedConfigNamespace, defaultTargetGRs)
+	encryptionCofnigSecret, err := clientSet.Kube.CoreV1().Secrets(operatorclient.GlobalMachineSpecifiedConfigNamespace).Get("encryption-config-openshift-kube-apiserver", metav1.GetOptions{})
+	require.NoError(t, err)
+	encodedEncryptionConfig, foundEncryptionConfig := encryptionCofnigSecret.Data["encryption-config"]
+	if !foundEncryptionConfig {
+		t.Errorf("Haven't found encryption config at %q key in the encryption secret %q", "encryption-config", "encryption-config-openshift-kube-apiserver")
+	}
+
+	decoder := apiserverCodecs.UniversalDecoder(apiserverconfigv1.SchemeGroupVersion)
+	encryptionConfigObj, err := runtime.Decode(decoder, encodedEncryptionConfig)
+	require.NoError(t, err)
+	encryptionConfig, ok := encryptionConfigObj.(*apiserverconfigv1.EncryptionConfiguration)
+	if !ok {
+		t.Errorf("Unable to decode encryption config, unexpected wrong type %T", encryptionConfigObj)
+	}
+
+	for _, rawActualResource := range encryptionConfig.Resources {
+		if len(rawActualResource.Resources) != 1 {
+			t.Errorf("Invalid encryption config for resource %s, expected exactly one resource, got %d", rawActualResource.Resources, len(rawActualResource.Resources))
+		}
+		actualResource := schema.ParseGroupResource(rawActualResource.Resources[0])
+		actualResourceFound := false
+		for _, expectedResource := range defaultTargetGRs {
+			if reflect.DeepEqual(expectedResource, actualResource) {
+				actualResourceFound = true
+				break
+			}
+		}
+		if !actualResourceFound {
+			t.Errorf("Encryption config has an invalid resource %v", actualResource)
+		}
 	}
 }
 
