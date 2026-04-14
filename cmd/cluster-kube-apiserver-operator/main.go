@@ -10,6 +10,7 @@ import (
 	"k8s.io/component-base/cli"
 
 	operatorclientv1 "github.com/openshift/client-go/operator/clientset/versioned/typed/operator/v1"
+	kmspreflight "github.com/openshift/library-go/pkg/operator/encryption/kms/preflight"
 	"github.com/openshift/library-go/pkg/operator/staticpod/certsyncpod"
 	"github.com/openshift/library-go/pkg/operator/staticpod/installerpod"
 	"github.com/openshift/library-go/pkg/operator/staticpod/prune"
@@ -57,6 +58,7 @@ func NewOperatorCommand(ctx context.Context) *cobra.Command {
 	cmd.AddCommand(certregenerationcontroller.NewCertRegenerationControllerCommand(ctx))
 	cmd.AddCommand(insecurereadyz.NewInsecureReadyzCommand())
 	cmd.AddCommand(checkendpoints.NewCheckEndpointsCommand())
+	cmd.AddCommand(kmspreflight.NewCommand(ctx))
 	cmd.AddCommand(startupmonitor.NewCommand(startupmonitorreadiness.New(), func(config *rest.Config) (operatorclientv1.KubeAPIServerInterface, error) {
 		client, err := operatorclientv1.NewForConfig(config)
 		if err != nil {
